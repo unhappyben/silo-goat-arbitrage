@@ -49,7 +49,7 @@ const TARGET_VAULTS = {
 
 const LTV_RATIOS: Record<string, number> = {
   "SILO": 0.50, "gmETH": 0.85, "weETH": 0.75, "ezETH": 0.87, "ARB": 0.70,
-  "PENDLE": 0.50, "GRAIL": 0.50, "wSTETH": 0.80, "wBTC": 0.80, "GNS": 0.50,
+  "PENDLE": 0.50, "GRAIL": 0.50, "wSTETH": 0.80, "WBTC": 0.80, "GNS": 0.50,
   "ETH+": 0.82, "WINR": 0.50, "tBTC": 0.75, "rETH": 0.70, "wUSD+": 0.88,
   "WOO": 0.50, "PEAS": 0.50, "GMX": 0.70, "TANGO": 0.65, "uniETH": 0.82,
   "MAGIC": 0.60, "PT-eETH (26 Dec)": 0.82, "PREMIA": 0.50, "PT-rsETH (26 Dec)": 0.87,
