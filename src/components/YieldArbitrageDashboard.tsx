@@ -180,7 +180,7 @@ const YieldArbitrageDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6" />
-            Yield Arbitrage Calculator
+            Silo x Goat.fi USDC.e Yield Arbitrage Calculator
           </CardTitle>
         </CardHeader>
         <CardContent>
