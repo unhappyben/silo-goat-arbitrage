@@ -47,6 +47,19 @@ const TARGET_VAULTS = {
   CRV_USD: '0xA7781F1D982Eb9000BC1733E29Ff5ba2824cDBE5'
 };
 
+const LTV_RATIOS: Record<string, number> = {
+  "SILO": 0.50, "gmETH": 0.85, "weETH": 0.75, "ezETH": 0.87, "ARB": 0.70,
+  "PENDLE": 0.50, "GRAIL": 0.50, "wSTETH": 0.80, "wBTC": 0.80, "GNS": 0.50,
+  "ETH+": 0.82, "WINR": 0.50, "tBTC": 0.75, "rETH": 0.70, "wUSD+": 0.88,
+  "WOO": 0.50, "PEAS": 0.50, "GMX": 0.70, "TANGO": 0.65, "uniETH": 0.82,
+  "MAGIC": 0.60, "PT-eETH (26 Dec)": 0.82, "PREMIA": 0.50, "PT-rsETH (26 Dec)": 0.87,
+  "RDNT": 0.65, "JONES": 0.50, "WOETH": 0.85, "PT-ezETH (26 Dec)": 0.87,
+  "DOPEX": 0.55, "Y2K": 0.50, "UNI": 0.50, "wUSDM": 0.90, "PT-eETH (26 Sept)": 0.85,
+  "stEUR": 0.75, "PT-ezETH (26 Sept)": 0.80, "PT-USDe (29 Aug)": 0.87, "JOE": 0.45,
+  "PT-USDe (28 Nov)": 0.87, "DLCBTC": 0.82, "ORDER": 0.60, "PT-rsETH (26 Jun 2025)": 0.90,
+  "PT-eETH (26 Jun 2025)": 0.90
+};
+
 const YieldArbitrageDashboard = () => {
   const [selectedAsset, setSelectedAsset] = useState<TokenInfo | null>(null);
   const [depositAmount, setDepositAmount] = useState('1000');
@@ -89,7 +102,7 @@ const YieldArbitrageDashboard = () => {
               name: market.marketName,
               borrowApy,
               depositApy,
-              ltv: market.maxLTV || 0.75,
+              ltv: LTV_RATIOS[market.marketSymbol],
               marketAddress: market.marketAddress
             };
           })
