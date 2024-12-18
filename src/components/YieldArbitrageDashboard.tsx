@@ -3,8 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { ArrowRight, TrendingUp, Wallet, Loader2, ExternalLink } from 'lucide-react';
+
+interface MarketData {
+  marketSymbol: string;
+  marketName: string;
+  marketAddress: string;
+  maxLTV: number;
+  baseAsset: {
+    depositTotalApr: string;
+  };
+  bridgeAssets: Array<{
+    symbol: string;
+    debtTotalApr: string;
+  }>;
+}
 
 interface TokenInfo {
   symbol: string;
@@ -21,6 +34,12 @@ interface Strategy {
   apy: number;
   type: string;
   vault: string;
+}
+
+interface GoatData {
+  [key: string]: {
+    vaultApy: number;
+  };
 }
 
 const TARGET_VAULTS = {
@@ -53,15 +72,15 @@ const YieldArbitrageDashboard = () => {
         const siloData = jsonData.props.pageProps.data;
         const timestamp = Date.now();
         const goatResponse = await fetch(`https://api.goat.fi/apy/breakdown?_=${timestamp}`);
-        const goatData = await goatResponse.json();
+        const goatData: GoatData = await goatResponse.json();
 
-        const markets = siloData.marketsByProtocol
-          .find((p: any) => p.protocolKey === 'arbitrum')?.markets || [];
+        const markets: MarketData[] = siloData.marketsByProtocol
+          .find((p: { protocolKey: string }) => p.protocolKey === 'arbitrum')?.markets || [];
 
         const processedAssets = markets
-          .filter((market: any) => market.bridgeAssets?.length > 0)
-          .map((market: any) => {
-            const bridgeAsset = market.bridgeAssets.find((asset: any) => asset.symbol === 'USDC.e');
+          .filter(market => market.bridgeAssets?.length > 0)
+          .map(market => {
+            const bridgeAsset = market.bridgeAssets.find(asset => asset.symbol === 'USDC.e');
             if (!bridgeAsset) return null;
             const depositApy = Number(market.baseAsset.depositTotalApr) / 1e18 * 100;
             const borrowApy = Number(bridgeAsset.debtTotalApr) / 1e18 * 100;
@@ -74,7 +93,7 @@ const YieldArbitrageDashboard = () => {
               marketAddress: market.marketAddress
             };
           })
-          .filter(Boolean);
+          .filter((asset): asset is TokenInfo => asset !== null);
 
         setAssets(processedAssets);
 
