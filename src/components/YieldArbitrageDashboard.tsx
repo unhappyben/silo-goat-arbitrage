@@ -294,8 +294,8 @@ const YieldArbitrageDashboard = () => {
 
                 <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
                   <span className="font-medium">Net Annual Yield:</span>
-                  <span className={netYield >= 0 ? "text-green-500" : "text-red-500"}>
-                    ${netYield?.toFixed(2)}
+                  <span className={netYield !== null && netYield >= 0 ? "text-green-500" : "text-red-500"}>
+                    ${netYield?.toFixed(2) || '0.00'}
                   </span>
                 </div>
 
