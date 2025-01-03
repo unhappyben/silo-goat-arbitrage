@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Image from 'next/image';
-import { ArrowRight, TrendingUp, Wallet, Loader2, ExternalLink, CreditCard, Coins } from 'lucide-react';
+import { ArrowRight, TrendingUp, Wallet, Loader2, ExternalLink } from 'lucide-react';
 
 interface MarketData {
   marketSymbol: string;
