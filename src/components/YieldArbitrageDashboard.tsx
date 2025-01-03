@@ -20,6 +20,7 @@ interface MarketData {
   bridgeAssets: Array<{
     symbol: string;
     debtTotalApr: string;
+    depositTotalApr?: string; 
   }>;
 }
 
