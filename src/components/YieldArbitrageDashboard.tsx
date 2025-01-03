@@ -161,13 +161,13 @@ const YieldArbitrageDashboard = () => {
 
   const StrategySelector = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <button
           onClick={() => {
             setStrategyType('borrow');
             setBorrowAsset('ETH');
           }}
-          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
             strategyType === 'borrow' && borrowAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
@@ -178,14 +178,14 @@ const YieldArbitrageDashboard = () => {
             height={24} 
             className="h-6 w-6" 
           />
-          <span className="ml-1">ETH Borrow</span>
+          <span className="text-sm md:text-base text-center">ETH Borrow</span>
         </button>
         <button
           onClick={() => {
             setStrategyType('borrow');
             setBorrowAsset('USDC.e');
           }}
-          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
             strategyType === 'borrow' && borrowAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
@@ -196,14 +196,14 @@ const YieldArbitrageDashboard = () => {
             height={24} 
             className="h-6 w-6"
           />
-          <span className="ml-1">USDC.e Borrow</span>
+          <span className="text-sm md:text-base text-center">USDC.e Borrow</span>
         </button>
         <button
           onClick={() => {
             setStrategyType('deposit');
             setDepositAsset('ETH');
           }}
-          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
             strategyType === 'deposit' && depositAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
@@ -214,14 +214,14 @@ const YieldArbitrageDashboard = () => {
             height={24} 
             className="h-6 w-6"
           />
-          <span className="ml-1">ETH Deposit</span>
+          <span className="text-sm md:text-base text-center">ETH Deposit</span>
         </button>
         <button
           onClick={() => {
             setStrategyType('deposit');
             setDepositAsset('USDC.e');
           }}
-          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
+          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
             strategyType === 'deposit' && depositAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
@@ -232,7 +232,7 @@ const YieldArbitrageDashboard = () => {
             height={24} 
             className="h-6 w-6"
           />
-          <span className="ml-1">USDC.e Deposit</span>
+          <span className="text-sm md:text-base text-center">USDC.e Deposit</span>
         </button>
       </div>
     </div>
