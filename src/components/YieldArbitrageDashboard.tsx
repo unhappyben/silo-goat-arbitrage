@@ -260,6 +260,14 @@ const YieldArbitrageDashboard = () => {
   
         const processedAssets = markets
           .filter(market => {
+            const logData = {
+              marketSymbol: market.marketSymbol,
+              marketName: market.marketName,
+              baseAsset: market.baseAsset,
+              bridgeAssets: market.bridgeAssets
+            };
+            console.log('Processing market:', logData);
+
             if (!market.bridgeAssets?.length) return false;
             
             if (strategyType === 'borrow') {
@@ -297,7 +305,7 @@ const YieldArbitrageDashboard = () => {
               
               return {
                 symbol: market.marketSymbol,
-                name: `${market.marketName} ${depositApy.toFixed(1)}%`,
+                name: `${market.marketSymbol} ${depositApy.toFixed(1)}%`,
                 borrowApy,
                 depositApy,
                 ltv: LTV_RATIOS[market.marketSymbol],
@@ -315,7 +323,7 @@ const YieldArbitrageDashboard = () => {
                 
                 return {
                   symbol: market.marketSymbol,
-                  name: `${market.marketName} - ETH - ${ethDepositApy.toFixed(1)}%`,
+                  name: `${market.marketSymbol} - ETH - ${ethDepositApy.toFixed(1)}%`,
                   borrowApy: usdceBorrowApy,
                   depositApy: ethDepositApy,
                   ltv: LTV_ETH_RATIOS[market.marketSymbol],
@@ -328,7 +336,7 @@ const YieldArbitrageDashboard = () => {
                 
                 return {
                   symbol: market.marketSymbol,
-                  name: `${market.marketName} - USDC.e - ${usdceDepositApy.toFixed(1)}%`,
+                  name: `${market.marketSymbol} - USDC.e - ${usdceDepositApy.toFixed(1)}%`,
                   borrowApy: ethBorrowApy,
                   depositApy: usdceDepositApy,
                   ltv: LTV_USDCE_RATIOS[market.marketSymbol],
@@ -445,7 +453,7 @@ const YieldArbitrageDashboard = () => {
                 >
                   {assets.map((asset) => (
                     <option key={asset.symbol} value={asset.symbol}>
-                      {asset.symbol} - {asset.name}
+                      {asset.name}
                     </option>
                   ))}
                 </select>
@@ -576,19 +584,19 @@ const YieldArbitrageDashboard = () => {
           <div className="flex items-center justify-between">
             <div className="text-center">
               <Wallet className="h-8 w-8 mx-auto mb-2" />
-              <div>{strategyType === 'deposit' ? 'Deposit' : 'Supply'} {selectedAsset?.symbol}</div>
+              <div>{strategyType === 'deposit' ? `Deposit ${depositAsset}` : `Supply ${selectedAsset?.symbol}`}</div>
               <div className="text-sm text-gray-500">${depositAmount || '0'}</div>
             </div>
             <ArrowRight className="h-6 w-6" />
             <div className="text-center">
               <TrendingUp className="h-8 w-8 mx-auto mb-2" />
-              <div>Borrow {strategyType === 'deposit' ? borrowAsset : depositAsset}</div>
+              <div>Borrow {strategyType === 'deposit' ? (depositAsset === 'ETH' ? 'USDC.e' : 'ETH') : borrowAsset}</div>
               <div className="text-sm text-gray-500">${borrowAmount || '0'}</div>
             </div>
             <ArrowRight className="h-6 w-6" />
             <div className="text-center">
               <Wallet className="h-8 w-8 mx-auto mb-2" />
-              <div>Earn on {selectedStrategy?.type}</div>
+              <div>Earn on {strategyType === 'deposit' ? (depositAsset === 'ETH' ? 'USDC.e' : 'ETH') : selectedStrategy?.type}</div>
               <div className="text-sm text-green-500">+{selectedStrategy?.apy.toFixed(2)}% APY</div>
             </div>
           </div>
