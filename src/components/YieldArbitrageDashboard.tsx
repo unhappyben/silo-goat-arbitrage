@@ -171,7 +171,9 @@ const YieldArbitrageDashboard = () => {
           <Image 
             src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
             alt="ETH"
-            className="h-6 w-6"
+            width={24} 
+            height={24} 
+            className="h-6 w-6" 
           />
           <span className="ml-1">ETH Borrow</span>
         </button>
@@ -187,6 +189,8 @@ const YieldArbitrageDashboard = () => {
           <Image 
             src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
             alt="USDC.e"
+            width={24} 
+            height={24} 
             className="h-6 w-6"
           />
           <span className="ml-1">USDC.e Borrow</span>
@@ -203,6 +207,8 @@ const YieldArbitrageDashboard = () => {
           <Image 
             src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
             alt="ETH"
+            width={24} 
+            height={24} 
             className="h-6 w-6"
           />
           <span className="ml-1">ETH Deposit</span>
@@ -219,6 +225,8 @@ const YieldArbitrageDashboard = () => {
           <Image 
             src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
             alt="USDC.e"
+            width={24} 
+            height={24} 
             className="h-6 w-6"
           />
           <span className="ml-1">USDC.e Deposit</span>
