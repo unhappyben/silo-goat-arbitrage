@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import Image from 'next/image';
 import { ArrowRight, TrendingUp, Wallet, Loader2, ExternalLink, CreditCard, Coins } from 'lucide-react';
 
 interface MarketData {
@@ -167,7 +168,7 @@ const YieldArbitrageDashboard = () => {
             strategyType === 'borrow' && borrowAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
-          <img 
+          <Image 
             src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
             alt="ETH"
             className="h-6 w-6"
@@ -183,7 +184,7 @@ const YieldArbitrageDashboard = () => {
             strategyType === 'borrow' && borrowAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
-          <img 
+          <Image 
             src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
             alt="USDC.e"
             className="h-6 w-6"
@@ -199,7 +200,7 @@ const YieldArbitrageDashboard = () => {
             strategyType === 'deposit' && depositAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
-          <img 
+          <Image 
             src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
             alt="ETH"
             className="h-6 w-6"
@@ -215,7 +216,7 @@ const YieldArbitrageDashboard = () => {
             strategyType === 'deposit' && depositAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
           }`}
         >
-          <img 
+          <Image 
             src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
             alt="USDC.e"
             className="h-6 w-6"
