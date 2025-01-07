@@ -70,11 +70,11 @@ const TARGET_VAULTS = {
   YCETH: {
     address: '0xe1c410eefAeBB052E17E0cB6F1c3197F35765Aab',
     symbol: 'ETH'
-  }//,
-  //YCUSDC: {
-  //  address: '0x0df2e3a0b5997AdC69f8768E495FD98A4D00F134',
- //   symbol: 'USDC'
- // }
+  },
+  YCUSDC: {
+    address: '0x0df2e3a0b5997AdC69f8768E495FD98A4D00F134',
+    symbol: 'USDC'
+  }
 };
 
 const LTV_RATIOS: Record<string, number> = {
@@ -122,6 +122,7 @@ const TOKENS = {
   ETH: formatTokenAddress('arbitrum', '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'),
   'USDC.e': formatTokenAddress('arbitrum', '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8'),
   USDC: formatTokenAddress('arbitrum', '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'),
+  crvUSD: formatTokenAddress('arbitrum', '0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5'), // Add crvUSD token address
 
   // Tokens from LTV_RATIOS
   SILO: formatTokenAddress('arbitrum', '0x0341c0c0ec423328621788d4854119b97f44e391'),

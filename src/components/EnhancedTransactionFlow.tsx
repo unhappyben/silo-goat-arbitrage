@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import React, { useState, useEffect } from 'react';
 import { useWriteContract, useAccount, useReadContract } from 'wagmi';
 import { Button } from "@/components/ui/button";
@@ -67,7 +69,6 @@ export function EnhancedTransactionFlow({
 
   const needsWethWrap = strategyType !== 'deposit' && borrowAsset === 'ETH';
   const needsUSDCSwap = selectedStrategy?.type === 'YCUSDC' && borrowAsset === 'USDC.e';
-
 
   const depositToken = selectedAsset?.symbol === 'ETH'
     ? ADDRESSES.TOKENS.ETH
@@ -155,7 +156,7 @@ export function EnhancedTransactionFlow({
 
   useEffect(() => {
     console.log('Step states updated:', stepStates, 'Current step:', currentStep);
-    
+
     const lastCompletedStep = Math.max(
       ...stepStates
         .filter(s => s.status === 'confirmed')
@@ -164,7 +165,7 @@ export function EnhancedTransactionFlow({
 
     const nextStep = lastCompletedStep + 1;
     const maxSteps = needsWethWrap ? 5 : 4;
-    
+
     if (nextStep > currentStep && nextStep <= maxSteps) {
       setTimeout(() => setCurrentStep(nextStep), 500);
     }
@@ -178,17 +179,17 @@ export function EnhancedTransactionFlow({
       needsUSDCSwap,
       totalSteps: steps.length
     });
-      
+
     const lastCompletedStep = Math.max(
       ...stepStates
         .filter(s => s.status === 'confirmed')
         .map(s => s.id),
       0  // Default to 0 if no steps completed
     );
-  
+
     const nextStep = lastCompletedStep + 1;
     const maxSteps = steps.length;
-    
+
     if (nextStep > currentStep && nextStep <= maxSteps) {
       console.log('Moving to next step:', nextStep);
       setTimeout(() => setCurrentStep(nextStep), 500);
@@ -206,7 +207,7 @@ export function EnhancedTransactionFlow({
     if (!address || !needsWethWrap) return;
     try {
       updateStepState(3, 'awaitingSignature');
-      
+
       const hash = await writeContract(config, {
         address: ADDRESSES.TOKENS.WETH as `0x${string}`,
         abi: ABIS.WETH,
@@ -214,7 +215,7 @@ export function EnhancedTransactionFlow({
         value: parseEther(borrowAmount),
         chain: arbitrum,
       });
-   
+
       if (hash) {
         updateStepState(3, 'pending');
         await waitForTransactionReceipt(config, {
@@ -236,10 +237,10 @@ export function EnhancedTransactionFlow({
     try {
       const stepId = needsWethWrap ? 4 : 3;
       updateStepState(stepId, 'awaitingSignature');
-      
+
       const ODOS_ROUTER = "0xa669e7a0d4b3e4fa48af2de86bd4cd7126be4e13";
       const usdceToken = ADDRESSES.TOKENS['USDC.e'];
-      
+
       const hash = await writeContract(config, {
         address: usdceToken as `0x${string}`,
         abi: ABIS.ERC20,
@@ -249,14 +250,14 @@ export function EnhancedTransactionFlow({
           BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
         ]
       });
-  
+
       if (hash) {
         updateStepState(stepId, 'pending');
         const receipt = await waitForTransactionReceipt(config, {
           hash,
           chainId: arbitrum.id
         });
-        
+
         if (receipt.status === 'success') {
           updateStepState(stepId, 'confirmed');
           const nextStep = needsWethWrap ? 5 : 4;
@@ -274,12 +275,11 @@ export function EnhancedTransactionFlow({
   };
 
   const handleOdosSwap = async () => {
-    if (!address || !selectedStrategy?.vault) {
-        setError("User address or selected strategy vault is missing");
+    if (!address || !selectedStrategy?.vault || !borrowAmount) {
+        setError("Missing required transaction parameters");
         return;
     }
 
-    const { data: walletClient } = useWalletClient();
     if (!walletClient) {
         setError("Wallet client is not available. Please connect your wallet.");
         return;
@@ -289,45 +289,39 @@ export function EnhancedTransactionFlow({
         const stepId = needsWethWrap ? 5 : 4;
         updateStepState(stepId, 'awaitingSignature');
 
-        // Step 1: Quote
+        // Determine decimals based on borrow asset
+        const decimals = borrowAsset === 'USDC.e' ? 6 : 18;
+        const amountToSwap = parseUnits(borrowAmount, decimals);
+
         const quoteUrl = 'https://api.odos.xyz/sor/quote/v2';
         const quoteRequestBody = {
             chainId: 42161,
             inputTokens: [{
-                tokenAddress: "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8", // USDC.e
-                amount: "20000000" // 20 USDC.e = 20 * 10^6
+                tokenAddress: ADDRESSES.TOKENS['USDC.e'],
+                amount: amountToSwap.toString()
             }],
             outputTokens: [{
-                tokenAddress: "0xaf88d065e77c8cc2239327c5edb3a432268e5831", // USDC
+                tokenAddress: ADDRESSES.TOKENS['USDC'],
                 proportion: 1
             }],
             userAddr: address,
-            slippageLimitPercent: 1.0, // Adjusted slippage tolerance
+            slippageLimitPercent: 1.0,
             referralCode: 0,
             disableRFQs: true,
             compact: true,
-            paths: [["0xff970a61a04b1ca14834a43f5de4533ebddb5cc8", "0xaf88d065e77c8cc2239327c5edb3a432268e5831"]]
+            paths: [[ADDRESSES.TOKENS['USDC.e'], ADDRESSES.TOKENS['USDC']]]
         };
-
-        console.log('Quote request body:', quoteRequestBody);
 
         const quoteResponse = await axios.post(quoteUrl, quoteRequestBody, {
             headers: { 'Content-Type': 'application/json' }
         });
 
         if (quoteResponse.status !== 200) {
-            console.error('Error in Quote Response:', quoteResponse);
             throw new Error('Failed to get quote from Odos');
         }
 
         const quote = quoteResponse.data;
-        console.log('Quote response:', quote);
 
-        if (!quote.pathId) {
-            throw new Error('Quote response missing pathId');
-        }
-
-        // Step 2: Assemble
         const assembleUrl = 'https://api.odos.xyz/sor/assemble';
         const assembleRequestBody = {
             userAddr: address,
@@ -335,34 +329,22 @@ export function EnhancedTransactionFlow({
             simulate: true
         };
 
-        console.log('Assemble request body:', assembleRequestBody);
-
         const assembleResponse = await axios.post(assembleUrl, assembleRequestBody, {
             headers: { 'Content-Type': 'application/json' }
         });
 
         if (assembleResponse.status !== 200) {
-            console.error('Error in Transaction Assembly:', assembleResponse);
             throw new Error('Failed to assemble transaction');
         }
 
-        const assembledTransaction = assembleResponse.data;
-        console.log('Assembled transaction details:', assembledTransaction);
+        const transaction = assembleResponse.data.transaction;
 
-        const transaction = assembledTransaction.transaction;
-        if (!transaction || !transaction.to || !transaction.data) {
-            throw new Error('Assembled transaction is incomplete');
-        }
-
-        // Step 3: Execute Transaction
         const hash = await walletClient.sendTransaction({
             to: transaction.to as `0x${string}`,
             data: transaction.data as `0x${string}`,
             value: BigInt(transaction.value || 0),
             chain: arbitrum
         });
-
-        console.log('Transaction submitted:', hash);
 
         if (hash) {
             updateStepState(stepId, 'pending');
@@ -372,8 +354,6 @@ export function EnhancedTransactionFlow({
                 timeout: 60_000
             });
 
-            console.log('Transaction receipt:', receipt);
-
             if (receipt.status === 'success') {
                 updateStepState(stepId, 'confirmed');
                 const nextStep = needsWethWrap ? 6 : 5;
@@ -382,19 +362,17 @@ export function EnhancedTransactionFlow({
                 throw new Error('Transaction failed');
             }
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Odos swap error:', error);
 
         const stepId = needsWethWrap ? 5 : 4;
         updateStepState(stepId, 'failed');
 
-        const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         setError(`Swap failed: ${errorMessage}`);
     }
 };
 
-
-   
   const handleSiloApproval = async () => {
     if (!selectedAsset) return;
     try {
@@ -402,12 +380,12 @@ export function EnhancedTransactionFlow({
       const tokenToApprove = strategyType === 'deposit'
         ? ADDRESSES.TOKENS[depositAsset as keyof typeof ADDRESSES.TOKENS]
         : ADDRESSES.TOKENS[selectedAsset.symbol as keyof typeof ADDRESSES.TOKENS];
-        
+
       const isUSDCe = depositAsset === 'USDC.e' || selectedAsset.symbol === 'USDC.e';
       const decimals = isUSDCe ? 6 : 18;
 
       const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-   
+
       const hash = await writeContract(config, {
         address: tokenToApprove as `0x${string}`,
         abi: ABIS.ERC20,
@@ -418,7 +396,7 @@ export function EnhancedTransactionFlow({
         ],
         chain: arbitrum,
       });
-   
+
       if (hash) {
         updateStepState(1, 'pending');
         await waitForTransactionReceipt(config, {
@@ -434,20 +412,20 @@ export function EnhancedTransactionFlow({
       setError('Failed to approve deposit. Please try again.');
     }
   };
-   
+
   const handleSiloDepositAndBorrow = async () => {
     if (!selectedAsset) return;
     try {
       updateStepState(2, 'awaitingSignature');
-      
-      const depositAmountParsed = selectedAsset.symbol === 'USDC.e' 
+
+      const depositAmountParsed = selectedAsset.symbol === 'USDC.e'
         ? parseUnits(depositAmount, 6)
         : parseEther(depositAmount);
-      
+
       const borrowAmountParsed = borrowAsset === 'USDC.e' || (strategyType === 'deposit' && depositAsset === 'ETH')
         ? parseUnits(borrowAmount, 6)
         : parseEther(borrowAmount);
-  
+
       const actions = [
         {
           actionType: 0,
@@ -466,19 +444,19 @@ export function EnhancedTransactionFlow({
           collateralOnly: false
         }
       ];
-  
+
       const hash = await writeContract(config, {
         address: ADDRESSES.SILO_ROUTER as `0x${string}`,
         abi: ABIS.SILO_ROUTER,
         functionName: 'execute',
         args: [actions],
-        value: (strategyType === 'deposit' && depositAsset === 'ETH') || 
-               (strategyType !== 'deposit' && selectedAsset.symbol === 'ETH') 
+        value: (strategyType === 'deposit' && depositAsset === 'ETH') ||
+               (strategyType !== 'deposit' && selectedAsset.symbol === 'ETH')
           ? depositAmountParsed
           : BigInt(0),
         chain: arbitrum,
       });
-  
+
       if (hash) {
         updateStepState(2, 'pending');
         await waitForTransactionReceipt(config, {
@@ -495,32 +473,32 @@ export function EnhancedTransactionFlow({
       setError('Failed to deposit and borrow. Please try again.');
     }
   };
-   
+
   const handleVaultApproval = async () => {
     if (!selectedStrategy?.vault) return;
     try {
       console.log("Starting vault approval with:", {
         strategy: selectedStrategy,
         borrowAmount,
-        tokenToApprove: strategyType === 'deposit' ? 'USDC.e' : borrowAsset,
+        tokenToApprove: selectedStrategy.type === 'YCUSDC' ? 'USDC' : borrowAsset,
         vault: selectedStrategy.vault
       });
-  
-      const stepId = needsWethWrap ? 4 : 3;
+
+      const stepId = (needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0);
       updateStepState(stepId, 'awaitingSignature');
-      
-      const tokenToApprove = strategyType === 'deposit'
-        ? ADDRESSES.TOKENS['USDC.e']
+
+      const tokenToApprove = selectedStrategy.type === 'YCUSDC'
+        ? ADDRESSES.TOKENS['USDC']
         : ADDRESSES.TOKENS[borrowAsset];
-        
+
       const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-  
+
       console.log("Approval params:", {
         tokenAddress: tokenToApprove,
         spender: selectedStrategy.vault,
         amount: maxApproval.toString()
       });
-  
+
       const hash = await writeContract(config, {
         address: tokenToApprove as `0x${string}`,
         abi: ABIS.ERC20,
@@ -531,7 +509,7 @@ export function EnhancedTransactionFlow({
         ],
         chain: arbitrum,
       });
-  
+
       if (hash) {
         console.log("Approval tx hash:", hash);
         updateStepState(stepId, 'pending');
@@ -541,17 +519,17 @@ export function EnhancedTransactionFlow({
         });
         console.log("Approval confirmed - moving to final step");
         updateStepState(stepId, 'confirmed');
-        const nextStep = needsWethWrap ? 5 : 4;
+        const nextStep = (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0);
         setTimeout(() => setCurrentStep(nextStep), 500);
       }
     } catch (error: unknown) {
       console.error('Vault approval error:', error);
-      const stepId = needsWethWrap ? 4 : 3;
+      const stepId = (needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0);
       updateStepState(stepId, 'failed');
       setError('Failed to approve vault. Please try again.');
     }
   };
-  
+
   const handleVaultDeposit = async () => {
     if (!selectedStrategy?.vault || !address) return;
     try {
@@ -560,25 +538,25 @@ export function EnhancedTransactionFlow({
         borrowAmount,
         userAddress: address
       });
-  
-      const stepId = needsWethWrap ? 5 : 4;
+
+      const stepId = (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0);
       updateStepState(stepId, 'awaitingSignature');
-      
-      const decimals = strategyType === 'deposit'
+
+      const decimals = selectedStrategy.type === 'YCUSDC'
         ? 6
         : (borrowAsset === 'USDC.e' ? 6 : 18);
-  
+
       const depositAmount = decimals === 18
         ? parseEther(borrowAmount)
         : parseUnits(borrowAmount, decimals);
-  
+
       console.log("Deposit params:", {
         vault: selectedStrategy.vault,
         amount: depositAmount.toString(),
         decimals,
         recipient: address
       });
-  
+
       const hash = await writeContract(config, {
         address: selectedStrategy.vault as `0x${string}`,
         abi: ABIS.VAULT,
@@ -589,7 +567,7 @@ export function EnhancedTransactionFlow({
         ],
         chain: arbitrum,
       });
-  
+
       if (hash) {
         console.log("Deposit tx hash:", hash);
         updateStepState(stepId, 'pending');
@@ -602,11 +580,12 @@ export function EnhancedTransactionFlow({
       }
     } catch (error: unknown) {
       console.error('Vault deposit error:', error);
-      const stepId = needsWethWrap ? 5 : 4;
+      const stepId = (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0);
       updateStepState(stepId, 'failed');
       setError('Failed to deposit in vault. Please try again.');
     }
   };
+
 
   const steps = [
     {
@@ -654,25 +633,26 @@ export function EnhancedTransactionFlow({
     ] : []),
       {
         id: (needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0),
-        title: strategyType === 'deposit'
-          ? 'Approve USDC for Goat.fi' // Changed from USDC.e
-          : `Approve ${borrowAsset === 'ETH' ? 'WETH' : borrowAsset} for Goat.fi`,
-        description: strategyType === 'deposit'
-          ? 'Approve Goat.fi vault to use your USDC' // Changed from USDC.e
-          : `Approve Goat.fi vault to use your ${borrowAsset === 'ETH' ? 'WETH' : borrowAsset}`,
+        title: strategyType === 'deposit' && needsUSDCSwap
+          ? 'Approve USDC for Goat.fi'
+          : `Approve ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)} for Goat.fi`,
+        description: strategyType === 'deposit' && needsUSDCSwap
+          ? 'Approve Goat.fi vault to use your USDC'
+          : `Approve Goat.fi vault to use your ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)}`,
         action: handleVaultApproval,
         isEnabled: currentStep === ((needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0))
       },
       {
         id: (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0),
         title: `Deposit in Vault`,
-        description: strategyType === 'deposit'
-          ? 'Deposit USDC in Goat.fi vault' // Changed from USDC.e
-          : `Deposit ${borrowAsset === 'ETH' ? 'WETH' : borrowAsset} in Goat.fi vault`,
+        description: strategyType === 'deposit' && needsUSDCSwap
+          ? 'Deposit USDC in Goat.fi vault'
+          : `Deposit ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)} in Goat.fi vault`,
         action: handleVaultDeposit,
         isEnabled: currentStep === ((needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0))
       }
-    ];
+  ];
+  
 
   const currentStepObj = steps.find(step => step.id === currentStep);
 
@@ -696,7 +676,7 @@ export function EnhancedTransactionFlow({
           </div>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
+          <div
             className="bg-blue-500 rounded-full h-2 transition-all duration-500"
             style={{ width: `${(Math.min(currentStep, steps.length) / steps.length) * 100}%` }}
           />
@@ -705,10 +685,10 @@ export function EnhancedTransactionFlow({
 
       <div className="space-y-2">
         {steps.map((step) => (
-          <div 
+          <div
             key={step.id}
             className={`p-3 rounded-lg border ${
-              currentStep === step.id 
+              currentStep === step.id
                 ? 'border-blue-500 bg-blue-50'
                 : getStepState(step.id) === 'confirmed'
                   ? 'border-green-500 bg-green-50'

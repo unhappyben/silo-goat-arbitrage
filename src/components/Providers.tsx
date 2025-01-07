@@ -1,4 +1,5 @@
-// src/components/Providers.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 "use client";
 
 import { WagmiProvider, createConfig } from 'wagmi'
