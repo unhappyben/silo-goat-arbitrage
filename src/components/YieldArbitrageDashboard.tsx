@@ -6,7 +6,14 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Image from 'next/image';
+import { WalletConnect } from "./WalletConnect";
+import { Button } from "@/components/ui/button";
+import { useSilo } from '@/hooks/useSilo';
+import axios from 'axios';
+import { EnhancedTransactionFlow } from './EnhancedTransactionFlow';
 import { ArrowRight, TrendingUp, Wallet, Loader2, ExternalLink } from 'lucide-react';
+
+
 
 interface MarketData {
   marketSymbol: string;
@@ -25,7 +32,7 @@ interface MarketData {
 }
 
 interface TokenInfo {
-  symbol: string;
+  symbol: string;  
   name: string;
   borrowApy: number;
   depositApy: number;
@@ -63,7 +70,11 @@ const TARGET_VAULTS = {
   YCETH: {
     address: '0xe1c410eefAeBB052E17E0cB6F1c3197F35765Aab',
     symbol: 'ETH'
-  }
+  }//,
+  //YCUSDC: {
+  //  address: '0x0df2e3a0b5997AdC69f8768E495FD98A4D00F134',
+ //   symbol: 'USDC'
+ // }
 };
 
 const LTV_RATIOS: Record<string, number> = {
@@ -100,6 +111,62 @@ const LTV_USDCE_RATIOS: Record<string, number> = {
   "Y2K": 0.8, "UNI": 0.8, "wUSDM": 0.8, 
   "stEUR": 0.75, "JOE": 0.65,
    "DLCBTC": 0.82, "ORDER": 0.60
+};
+
+const formatTokenAddress = (chain: string, address: string) => {
+  return address;  
+};
+
+const TOKENS = {
+  // Base tokens
+  ETH: formatTokenAddress('arbitrum', '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'),
+  USDC_E: formatTokenAddress('arbitrum', '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8'),
+  USDC: formatTokenAddress('arbitrum', '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'),
+
+  // Tokens from LTV_RATIOS
+  SILO: formatTokenAddress('arbitrum', '0x0341c0c0ec423328621788d4854119b97f44e391'),
+  GM_ETH: formatTokenAddress('arbitrum', '0xfB3264D1129824933a52374c2C1696F4470D041e'),
+  WE_ETH: formatTokenAddress('arbitrum', '0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe'),
+  EZ_ETH: formatTokenAddress('arbitrum', '0x2416092f143378750bb29b79eD961ab195CcEea5'),
+  ARB: formatTokenAddress('arbitrum', '0x912ce59144191c1204e64559fe8253a0e49e6548'),
+  PENDLE: formatTokenAddress('arbitrum', '0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8'),
+  GRAIL: formatTokenAddress('arbitrum', '0x3d9907f9a368ad0a51be60f7da3b97cf940982d8'),
+  WST_ETH: formatTokenAddress('arbitrum', '0x5979D7b546E38E414F7E9822514be443A4800529'),
+  WBTC: formatTokenAddress('arbitrum', '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f'),
+  GNS: formatTokenAddress('arbitrum', '0x18c11FD286C5EC11c3b683Caa813B77f5163A122'),
+  ETH_PLUS: formatTokenAddress('arbitrum', '0x18C14C2D707b2212e17d1579789Fc06010cfca23'),
+  WINR: formatTokenAddress('arbitrum', '0xD77B108d4f6cefaa0Cae9506A934e825BEccA46E'),
+  tbtc: formatTokenAddress('arbitrum', '0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40'),
+  R_ETH: formatTokenAddress('arbitrum', '0xEC70Dcb4A1EFa46b8F2D97C310C9c4790ba5ffA8'),
+  W_USD_PLUS: formatTokenAddress('arbitrum', '0xB86fb1047A955C0186c77ff6263819b37B32440D'),
+  WOO: formatTokenAddress('arbitrum', '0xcAFcD85D8ca7Ad1e1C6F82F651fA15E33AEfD07b'),
+  PEAS: formatTokenAddress('arbitrum', '0x02f92800F57BCD74066F5709F1Daa1A4302Df875'),
+  GMX: formatTokenAddress('arbitrum', '0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a'),
+  TANGO: formatTokenAddress('arbitrum', '0xC760F9782F8ceA5B06D862574464729537159966'),
+  UNI_ETH: formatTokenAddress('arbitrum', '0x3d15fD46CE9e551498328B1C83071D9509E2C3a0'),
+  MAGIC: formatTokenAddress('arbitrum', '0x539bdE0d7Dbd336b79148AA742883198BBF60342'),
+  PREMIA: formatTokenAddress('arbitrum', '0x51fC0f6660482Ea73330E414eFd7808811a57Fa2'),
+  RDNT: formatTokenAddress('arbitrum', '0x3082CC23568eA640225c2467653dB90e9250AaA0'),
+  JONES: formatTokenAddress('arbitrum', '0x10393c20975cF177a3513071bC110f7962CD67da'),
+  WOETH: formatTokenAddress('arbitrum', '0xd8724322f44e5c58d7a815f542036fb17dbbf839'),
+  Y2K: formatTokenAddress('arbitrum', '0x65c936f008BC34fE819bce9Fa5afD9dc2d49977f'),
+  UNI: formatTokenAddress('arbitrum', '0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0'),
+  W_USDM: formatTokenAddress('arbitrum', '0x57F5E098CaD7A3D1Eed53991D4d66C45C9AF7812'),
+  ST_EUR: formatTokenAddress('arbitrum', '0x004626A008B1aCdC4c74ab51644093b155e59A23'),
+  JOE: formatTokenAddress('arbitrum', '0xf57f2cCbB30c3C5ea982F21195df435d179d6b48'),
+  DLC_BTC: formatTokenAddress('arbitrum', '0x050C24dBf1eEc17babE5fc585F06116A259CC77A'),
+  ORDER: formatTokenAddress('arbitrum', '0x4E200fE2f3eFb977d5fd9c430A41531FB04d97B8'),
+  
+  // Additional specific tokens
+  PT_EETH_DEC: formatTokenAddress('arbitrum', 'PT-eETH (26 Dec)'),
+  PT_RSET_DEC: formatTokenAddress('arbitrum', 'PT-rsETH (26 Dec)'),
+  PT_EZETH_DEC: formatTokenAddress('arbitrum', 'PT-ezETH (26 Dec)'),
+  PT_EETH_SEPT: formatTokenAddress('arbitrum', 'PT-eETH (26 Sept)'),
+  PT_EZETH_SEPT: formatTokenAddress('arbitrum', 'PT-ezETH (26 Sept)'),
+  PT_USDCE_AUG: formatTokenAddress('arbitrum', 'PT-USDe (29 Aug)'),
+  PT_USDCE_NOV: formatTokenAddress('arbitrum', 'PT-USDe (28 Nov)'),
+  PT_RSET_LONG: formatTokenAddress('arbitrum', 'PT-rsETH (26 Jun 2025)'),
+  PT_EETH_LONG: formatTokenAddress('arbitrum', 'PT-eETH (26 Jun 2025)'),
 };
 
 
@@ -147,8 +214,9 @@ const calculateBestStrategy = (assets: TokenInfo[], strategies: Strategy[]) => {
 
 const YieldArbitrageDashboard = () => {
   const [strategyType, setStrategyType] = useState('borrow');
-  const [depositAsset, setDepositAsset] = useState('USDC.e');
-  const [borrowAsset, setBorrowAsset] = useState('ETH');
+  const [depositAsset, setDepositAsset] = useState<'ETH' | 'USDC.e'>('USDC.e');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [borrowAsset, setBorrowAsset] = useState<'ETH' | 'USDC.e'>('ETH');
   const [activeTab, setActiveTab] = useState<'home' | 'best-strat'>('home');
   const [selectedAsset, setSelectedAsset] = useState<TokenInfo | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
@@ -158,85 +226,200 @@ const YieldArbitrageDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [assets, setAssets] = useState<TokenInfo[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
-
-  const StrategySelector = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <button
-          onClick={() => {
-            setStrategyType('borrow');
-            setBorrowAsset('ETH');
-          }}
-          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
-            strategyType === 'borrow' && borrowAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
-          }`}
-        >
-          <Image 
-            src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
-            alt="ETH"
-            width={24} 
-            height={24} 
-            className="h-6 w-6" 
-          />
-          <span className="text-sm md:text-base text-center">ETH Borrow</span>
-        </button>
-        <button
-          onClick={() => {
-            setStrategyType('borrow');
-            setBorrowAsset('USDC.e');
-          }}
-          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
-            strategyType === 'borrow' && borrowAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
-          }`}
-        >
-          <Image 
-            src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
-            alt="USDC.e"
-            width={24} 
-            height={24} 
-            className="h-6 w-6"
-          />
-          <span className="text-sm md:text-base text-center">USDC.e Borrow</span>
-        </button>
-        <button
-          onClick={() => {
-            setStrategyType('deposit');
-            setDepositAsset('ETH');
-          }}
-          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
-            strategyType === 'deposit' && depositAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
-          }`}
-        >
-          <Image 
-            src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
-            alt="ETH"
-            width={24} 
-            height={24} 
-            className="h-6 w-6"
-          />
-          <span className="text-sm md:text-base text-center">ETH Deposit</span>
-        </button>
-        <button
-          onClick={() => {
-            setStrategyType('deposit');
-            setDepositAsset('USDC.e');
-          }}
-          className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all ${
-            strategyType === 'deposit' && depositAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
-          }`}
-        >
-          <Image 
-            src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
-            alt="USDC.e"
-            width={24} 
-            height={24} 
-            className="h-6 w-6"
-          />
-          <span className="text-sm md:text-base text-center">USDC.e Deposit</span>
-        </button>
-      </div>
-    </div>
+  const { depositAndBorrow } = useSilo(
+    selectedAsset?.marketAddress || '', 
+    borrowAsset  
   );
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [priceLoading, setPriceLoading] = useState(false);
+
+  const fetchTokenPrice = async (tokenKey: string) => {
+    try {
+      setPriceLoading(true);
+      const tokenAddress = TOKENS[tokenKey as keyof typeof TOKENS];
+      
+      if (!tokenAddress) {
+        console.error(`No token address found for ${tokenKey}`);
+        return;
+      }
+  
+      // Add chain prefix for API call
+      const defilllamaAddress = `arbitrum:${tokenAddress}`;
+      
+      const response = await axios.get(
+        `https://coins.llama.fi/prices/current/${defilllamaAddress}`
+      );
+      
+      const price = response.data.coins[defilllamaAddress]?.price;
+      
+      if (price) {
+        setPrices(prev => ({
+          ...prev,
+          [tokenAddress]: price  // Store with original address as key
+        }));
+      }
+    } catch (error) {
+      console.error(`Error fetching price for ${tokenKey}:`, error);
+    } finally {
+      setPriceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedAsset) {
+      fetchTokenPrice(selectedAsset.symbol);
+    }
+  }, [selectedAsset]);
+
+  // Fetch price for borrow asset
+  useEffect(() => {
+    fetchTokenPrice(borrowAsset);
+  }, [borrowAsset]);
+
+  //hardcoded bc for some reason defillama api didnt like usdce -- too lazy to look at 
+  const getUSDValue = (amount: string, token: string) => {
+    if (token === 'USDC.e') {
+      return parseFloat(amount).toFixed(2);  // Direct 1:1 conversion
+    }
+    const tokenAddress = TOKENS[token as keyof typeof TOKENS];
+    const tokenPrice = prices[tokenAddress];
+    return tokenPrice ? (parseFloat(amount) * tokenPrice).toFixed(2) : '0.00';
+  };
+
+  const getMaxBorrow = () => {
+    if (!selectedAsset || !depositAmount) return 0;
+    
+    // For deposit strategies
+    if (strategyType === 'deposit') {
+      const depositUsdValue = depositAsset === 'USDC.e' 
+        ? parseFloat(depositAmount) // 1:1 for USDC.e
+        : parseFloat(depositAmount) * (prices[TOKENS['ETH' as keyof typeof TOKENS]] || 0);
+      return depositUsdValue * selectedAsset.ltv;
+    }
+    
+    // For borrow strategies
+    const depositUsdValue = selectedAsset.symbol === 'USDC.e'
+      ? parseFloat(depositAmount)
+      : parseFloat(depositAmount) * (prices[TOKENS[selectedAsset.symbol as keyof typeof TOKENS]] || 0);
+    return depositUsdValue * selectedAsset.ltv;
+  };
+  
+  const isOverMaxBorrow = () => {
+    const maxBorrow = getMaxBorrow();
+    if (maxBorrow === 0) return false;
+    
+    const currentBorrowUsd = strategyType === 'deposit'
+      ? (depositAsset === 'ETH' 
+          ? parseFloat(borrowAmount || '0') // USDC.e borrow
+          : parseFloat(borrowAmount || '0') * (prices[TOKENS['ETH' as keyof typeof TOKENS]] || 0)) // ETH borrow
+      : (borrowAsset === 'USDC.e'
+          ? parseFloat(borrowAmount || '0')
+          : parseFloat(borrowAmount || '0') * (prices[TOKENS[borrowAsset as keyof typeof TOKENS]] || 0));
+          
+    return currentBorrowUsd > maxBorrow;
+  };
+
+
+const StrategySelector = () => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <button
+        onClick={() => {
+          console.log('Strategy button clicked');
+          setStrategyType('borrow');
+          setBorrowAsset('ETH');
+        }}
+        className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all tab-button ${
+          strategyType === 'borrow' && borrowAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
+        }`}
+      >
+        <Image 
+          src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
+          alt="ETH"
+          width={24} 
+          height={24} 
+          className="h-6 w-6" 
+        />
+        <span className="text-sm md:text-base text-center">ETH Borrow</span>
+      </button>
+      <button
+        onClick={() => {
+          console.log('Strategy button clicked');
+          setStrategyType('borrow');
+          setBorrowAsset('USDC.e');
+        }}
+        className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all tab-button ${
+          strategyType === 'borrow' && borrowAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
+        }`}
+      >
+        <Image 
+          src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
+          alt="USDC.e"
+          width={24} 
+          height={24} 
+          className="h-6 w-6"
+        />
+        <span className="text-sm md:text-base text-center">USDC.e Borrow</span>
+      </button>
+      <button
+        onClick={() => {
+          console.log('Strategy button clicked');
+          setStrategyType('deposit');
+          setDepositAsset('ETH');
+        }}
+        className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all tab-button ${
+          strategyType === 'deposit' && depositAsset === 'ETH' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
+        }`}
+      >
+        <Image 
+          src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png?1696501628" 
+          alt="ETH"
+          width={24} 
+          height={24} 
+          className="h-6 w-6"
+        />
+        <span className="text-sm md:text-base text-center">ETH Deposit</span>
+      </button>
+      <button
+        onClick={() => {
+          console.log('Strategy button clicked');
+          setStrategyType('deposit');
+          setDepositAsset('USDC.e');
+        }}
+        className={`flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 p-3 md:px-4 md:py-2 rounded-lg transition-all tab-button ${
+          strategyType === 'deposit' && depositAsset === 'USDC.e' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-gray-100 hover:bg-gray-200'
+        }`}
+      >
+        <Image 
+          src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png?1696506694" 
+          alt="USDC.e"
+          width={24} 
+          height={24} 
+          className="h-6 w-6"
+        />
+        <span className="text-sm md:text-base text-center">USDC.e Deposit</span>
+      </button>
+    </div>
+  </div>
+);
+
+const executeTransaction = async () => {
+  try {
+    setIsExecuting(true);
+    if (!selectedAsset?.symbol) throw new Error('No asset selected');
+    await depositAndBorrow(
+      depositAmount,
+      borrowAmount,
+      selectedAsset.symbol
+    );
+  } catch (error) {
+    console.error('Transaction failed:', error);
+  } finally {
+    setIsExecuting(false);
+  }
+};
+
+  
 
   useEffect(() => {
     const fetchData = async () => {
@@ -353,17 +536,26 @@ const YieldArbitrageDashboard = () => {
         setAssets(processedAssets);
   
         const processedStrategies = Object.entries(TARGET_VAULTS)
-          .filter(([_, vault]) => {
-            if (strategyType === 'borrow') {
-              // When in borrow mode, show vaults for the borrowed asset
-              return vault.symbol === borrowAsset;
-            } else if (strategyType === 'deposit') {
-              // When in deposit mode, show vaults for what we'll borrow
-              // If depositing ETH, show USDC.e vaults; if depositing USDC.e, show ETH vaults
-              return vault.symbol === (depositAsset === 'ETH' ? 'USDC.e' : 'ETH');
+        .filter(([_, vault]) => {
+          if (strategyType === 'borrow') {
+            // When in borrow mode, show vaults for the borrowed asset
+            // If borrowing USDC.e, show both USDC.e and USDC vaults
+            if (borrowAsset === 'USDC.e') {
+              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC';
             }
-            return false;
-          })
+            return vault.symbol === borrowAsset;
+          } else if (strategyType === 'deposit') {
+            // When in deposit mode, show vaults for what we'll borrow
+            if (depositAsset === 'ETH') {
+              // If depositing ETH, show both USDC.e and USDC vaults
+              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC';
+            } else {
+              // If depositing USDC.e, show ETH vaults
+              return vault.symbol === 'ETH';
+            }
+          }
+          return false;
+        })
           .map(([key, vault]) => ({
             address: vault.address,
             name: `${key.replace('_', '.')} Vault Strategy`,
@@ -398,7 +590,10 @@ const YieldArbitrageDashboard = () => {
     const borrow = parseFloat(borrowAmount);
     
     if (isNaN(deposit) || isNaN(borrow) || deposit <= 0 || borrow <= 0) return null;
-
+  
+    const depositPrice = prices[TOKENS[selectedAsset.symbol as keyof typeof TOKENS]] || 0;
+    const borrowPrice = prices[TOKENS[borrowAsset as keyof typeof TOKENS]] || 0;
+  
     const depositYield = deposit * (selectedAsset.depositApy / 100);
     const borrowCost = borrow * (selectedAsset.borrowApy / 100);
     const strategyYield = borrow * (selectedStrategy.apy / 100);
@@ -470,26 +665,55 @@ const YieldArbitrageDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">{strategyType === 'deposit' ? 'Deposit' : 'Collateral'} Amount ($)</label>
+                <label className="block text-sm font-medium mb-1">
+                  {strategyType === 'deposit' ? 'Deposit' : 'Collateral'} Amount
+                </label>
                 <Input
                   type="number"
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
                   className="w-full"
                 />
+                {selectedAsset && prices[TOKENS[selectedAsset.symbol as keyof typeof TOKENS]] && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    ≈ ${getUSDValue(depositAmount, selectedAsset.symbol)} USD
+                    {priceLoading && <span className="ml-2 text-blue-500">Updating price...</span>}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Borrow Amount ($)</label>
+                <label className="block text-sm font-medium mb-1">
+                  Borrow Amount ({strategyType === 'deposit' 
+                    ? (depositAsset === 'ETH' ? 'USDC.e' : 'ETH')
+                    : borrowAsset})
+                </label>
                 <Input
                   type="number"
                   value={borrowAmount}
                   onChange={(e) => setBorrowAmount(e.target.value)}
-                  className="w-full"
+                  className={`w-full ${isOverMaxBorrow() ? 'border-red-500 ring-red-500' : ''}`}
                 />
-                <div className="text-sm text-gray-500 mt-1">
-                  Max: ${selectedAsset ? (parseFloat(depositAmount || '0') * selectedAsset.ltv).toFixed(2) : '0.00'}
+                {(() => {
+                  const priceToken = strategyType === 'deposit'
+                    ? (depositAsset === 'ETH' ? 'USDC.e' : 'ETH')
+                    : borrowAsset;
+                  
+                  return (
+                    <div className="text-sm text-gray-500 mt-1">
+                      ≈ ${getUSDValue(borrowAmount, priceToken)} USD
+                      {priceLoading && <span className="ml-2 text-blue-500">Updating price...</span>}
+                    </div>
+                  );
+                })()}
+                <div className={`text-sm mt-1 ${isOverMaxBorrow() ? 'text-red-500' : 'text-gray-500'}`}>
+                  Max: ${getMaxBorrow().toFixed(2)}
                 </div>
+                {isOverMaxBorrow() && (
+                  <div className="text-sm text-red-500 mt-1">
+                    Borrow amount exceeds maximum allowed
+                  </div>
+                )}
               </div>
 
               <div>
@@ -518,6 +742,17 @@ const YieldArbitrageDashboard = () => {
                     Earn yield here <ExternalLink className="h-3 w-3 ml-1" />
                   </a>
                 )}
+
+              <EnhancedTransactionFlow
+                depositAmount={depositAmount}
+                borrowAmount={borrowAmount}
+                selectedAsset={selectedAsset}
+                selectedStrategy={selectedStrategy}
+                strategyType={strategyType}
+                borrowAsset={borrowAsset}
+                depositAsset={depositAsset}
+              />
+
               </div>
             </div>
           </Card>
@@ -761,12 +996,13 @@ const YieldArbitrageDashboard = () => {
 
   return (
     <div className="w-full max-w-4xl space-y-4">
-      <Card>
-        <CardHeader>
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
           <div className="flex space-x-2">
             <button
               onClick={() => setActiveTab('home')}
-              className={`px-4 py-2 rounded-md ${
+              className={`px-4 py-2 rounded-md tab-button ${
                 activeTab === 'home'
                   ? 'bg-gray-200 font-medium'
                   : 'bg-gray-100 hover:bg-gray-200'
@@ -776,7 +1012,7 @@ const YieldArbitrageDashboard = () => {
             </button>
             <button
               onClick={() => setActiveTab('best-strat')}
-              className={`px-4 py-2 rounded-md ${
+              className={`px-4 py-2 rounded-md tab-button ${
                 activeTab === 'best-strat'
                   ? 'bg-gray-200 font-medium'
                   : 'bg-gray-100 hover:bg-gray-200'
@@ -785,8 +1021,10 @@ const YieldArbitrageDashboard = () => {
               Best Yield Strategy
             </button>
           </div>
-        </CardHeader>
-      </Card>
+          <WalletConnect />
+        </div>
+      </CardHeader>
+    </Card>
 
       {activeTab === 'home' ? renderMainCalculator() : renderBestStrategy()}
     </div>

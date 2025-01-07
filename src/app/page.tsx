@@ -1,11 +1,13 @@
-"use client";
-
+// src/app/page.tsx
+import { Providers } from "@/components/Providers";
 import YieldArbitrageDashboard from "@/components/YieldArbitrageDashboard";
 
 export default function Home() {
   return (
-    <div className="flex justify-center">
-      <YieldArbitrageDashboard />
-    </div>
+    <Providers>
+      <div className="flex justify-center">
+        <YieldArbitrageDashboard />
+      </div>
+    </Providers>
   );
 }
