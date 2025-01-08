@@ -11,6 +11,7 @@ import { parseUnits, parseEther } from 'viem';
 import { arbitrum } from 'viem/chains';
 import { type Hash } from 'viem';
 import axios from 'axios';
+import { TOKENS } from './YieldArbitrageDashboard';
 import { useWalletClient } from 'wagmi';
 import { waitForTransactionReceipt, readContract, writeContract } from '@wagmi/core';
 
@@ -42,6 +43,7 @@ interface EnhancedTransactionFlowProps {
 }
 
 type TransactionState = 'idle' | 'awaitingSignature' | 'pending' | 'confirmed' | 'failed';
+type StrategyType = 'borrow' | 'deposit';
 
 interface StepState {
   id: number;
@@ -68,8 +70,7 @@ export function EnhancedTransactionFlow({
   const [stepStates, setStepStates] = useState<StepState[]>([]);
 
   const needsWethWrap = strategyType !== 'deposit' && borrowAsset === 'ETH';
-  const needsUSDCSwap = selectedStrategy?.type === 'YCUSDC' && borrowAsset === 'USDC.e';
-
+  const needsUSDCSwap = (selectedStrategy?.type === 'YCUSDC' || selectedStrategy?.type === 'CRV_USD') && borrowAsset === 'USDC.e';
   const depositToken = selectedAsset?.symbol === 'ETH'
     ? ADDRESSES.TOKENS.ETH
     : selectedAsset?.symbol ? ADDRESSES.TOKENS[selectedAsset.symbol as keyof typeof ADDRESSES.TOKENS] : '';
@@ -276,102 +277,120 @@ export function EnhancedTransactionFlow({
 
   const handleOdosSwap = async () => {
     if (!address || !selectedStrategy?.vault || !borrowAmount) {
-        setError("Missing required transaction parameters");
-        return;
+      setError("Missing required transaction parameters");
+      return;
     }
-
+  
     if (!walletClient) {
-        setError("Wallet client is not available. Please connect your wallet.");
-        return;
+      setError("Wallet client is not available. Please connect your wallet.");
+      return;
     }
-
+  
     try {
-        const stepId = needsWethWrap ? 5 : 4;
-        updateStepState(stepId, 'awaitingSignature');
-
-        // Determine decimals based on borrow asset
-        const decimals = borrowAsset === 'USDC.e' ? 6 : 18;
-        const amountToSwap = parseUnits(borrowAmount, decimals);
-
-        const quoteUrl = 'https://api.odos.xyz/sor/quote/v2';
-        const quoteRequestBody = {
-            chainId: 42161,
-            inputTokens: [{
-                tokenAddress: ADDRESSES.TOKENS['USDC.e'],
-                amount: amountToSwap.toString()
-            }],
-            outputTokens: [{
-                tokenAddress: ADDRESSES.TOKENS['USDC'],
-                proportion: 1
-            }],
-            userAddr: address,
-            slippageLimitPercent: 1.0,
-            referralCode: 0,
-            disableRFQs: true,
-            compact: true,
-            paths: [[ADDRESSES.TOKENS['USDC.e'], ADDRESSES.TOKENS['USDC']]]
-        };
-
-        const quoteResponse = await axios.post(quoteUrl, quoteRequestBody, {
-            headers: { 'Content-Type': 'application/json' }
+      const stepId = needsWethWrap ? 5 : 4;
+      updateStepState(stepId, 'awaitingSignature');
+  
+      // Determine decimals based on borrow asset
+      const decimals = borrowAsset === 'USDC.e' ? 6 : 18;
+      const amountToSwap = parseUnits(borrowAmount, decimals);
+  
+      // Determine target token based on strategy type
+      const targetToken = selectedStrategy?.type === 'CRV_USD' ? 'crvUSD' : 'USDC';
+      const targetTokenAddress = TOKENS[targetToken];
+  
+      console.log('Swap Details:', {
+        sourceToken: 'USDC.e',
+        targetToken,
+        amount: amountToSwap.toString(),
+        targetAddress: targetTokenAddress
+      });
+  
+      const quoteUrl = 'https://api.odos.xyz/sor/quote/v2';
+      const quoteRequestBody = {
+        chainId: 42161, // Arbitrum
+        inputTokens: [{
+          tokenAddress: TOKENS['USDC.e'],
+          amount: amountToSwap.toString()
+        }],
+        outputTokens: [{
+          tokenAddress: targetTokenAddress,
+          proportion: 1
+        }],
+        userAddr: address,
+        slippageLimitPercent: 1.0,
+        referralCode: 0,
+        disableRFQs: true,
+        compact: true,
+        // Force path through specific tokens for better routing
+        paths: [[TOKENS['USDC.e'], targetTokenAddress]]
+      };
+  
+      console.log('Requesting quote with:', quoteRequestBody);
+      const quoteResponse = await axios.post(quoteUrl, quoteRequestBody, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+  
+      if (quoteResponse.status !== 200) {
+        throw new Error('Failed to get quote from Odos');
+      }
+  
+      const quote = quoteResponse.data;
+      console.log('Received quote:', quote);
+  
+      const assembleUrl = 'https://api.odos.xyz/sor/assemble';
+      const assembleRequestBody = {
+        userAddr: address,
+        pathId: quote.pathId,
+        simulate: true
+      };
+  
+      console.log('Requesting transaction assembly with:', assembleRequestBody);
+      const assembleResponse = await axios.post(assembleUrl, assembleRequestBody, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+  
+      if (assembleResponse.status !== 200) {
+        throw new Error('Failed to assemble transaction');
+      }
+  
+      const transaction = assembleResponse.data.transaction;
+      console.log('Transaction assembled:', transaction);
+  
+      const hash = await walletClient.sendTransaction({
+        to: transaction.to as `0x${string}`,
+        data: transaction.data as `0x${string}`,
+        value: BigInt(transaction.value || 0),
+        chain: arbitrum
+      });
+  
+      if (hash) {
+        console.log('Transaction submitted:', hash);
+        updateStepState(stepId, 'pending');
+        const receipt = await waitForTransactionReceipt(config, {
+          hash,
+          chainId: arbitrum.id,
+          timeout: 60_000
         });
-
-        if (quoteResponse.status !== 200) {
-            throw new Error('Failed to get quote from Odos');
+  
+        if (receipt.status === 'success') {
+          console.log('Transaction confirmed');
+          updateStepState(stepId, 'confirmed');
+          const nextStep = needsWethWrap ? 6 : 5;
+          setTimeout(() => setCurrentStep(nextStep), 500);
+        } else {
+          throw new Error('Transaction failed');
         }
-
-        const quote = quoteResponse.data;
-
-        const assembleUrl = 'https://api.odos.xyz/sor/assemble';
-        const assembleRequestBody = {
-            userAddr: address,
-            pathId: quote.pathId,
-            simulate: true
-        };
-
-        const assembleResponse = await axios.post(assembleUrl, assembleRequestBody, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (assembleResponse.status !== 200) {
-            throw new Error('Failed to assemble transaction');
-        }
-
-        const transaction = assembleResponse.data.transaction;
-
-        const hash = await walletClient.sendTransaction({
-            to: transaction.to as `0x${string}`,
-            data: transaction.data as `0x${string}`,
-            value: BigInt(transaction.value || 0),
-            chain: arbitrum
-        });
-
-        if (hash) {
-            updateStepState(stepId, 'pending');
-            const receipt = await waitForTransactionReceipt(config, {
-                hash,
-                chainId: arbitrum.id,
-                timeout: 60_000
-            });
-
-            if (receipt.status === 'success') {
-                updateStepState(stepId, 'confirmed');
-                const nextStep = needsWethWrap ? 6 : 5;
-                setTimeout(() => setCurrentStep(nextStep), 500);
-            } else {
-                throw new Error('Transaction failed');
-            }
-        }
+      }
     } catch (error: unknown) {
-        console.error('Odos swap error:', error);
-
-        const stepId = needsWethWrap ? 5 : 4;
-        updateStepState(stepId, 'failed');
-
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        setError(`Swap failed: ${errorMessage}`);
+      console.error('Odos swap error:', error);
+      const stepId = needsWethWrap ? 5 : 4;
+      updateStepState(stepId, 'failed');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Swap failed: ${errorMessage}`);
     }
-};
+  };
+  
+  
 
   const handleSiloApproval = async () => {
     if (!selectedAsset) return;
@@ -488,7 +507,9 @@ export function EnhancedTransactionFlow({
       updateStepState(stepId, 'awaitingSignature');
 
       const tokenToApprove = selectedStrategy.type === 'YCUSDC'
-        ? ADDRESSES.TOKENS['USDC']
+      ? ADDRESSES.TOKENS['USDC']
+      : selectedStrategy.type === 'CRV_USD'
+        ? ADDRESSES.TOKENS['crvUSD']
         : ADDRESSES.TOKENS[borrowAsset];
 
       const maxApproval = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
@@ -538,25 +559,27 @@ export function EnhancedTransactionFlow({
         borrowAmount,
         userAddress: address
       });
-
+  
       const stepId = (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0);
       updateStepState(stepId, 'awaitingSignature');
-
-      const decimals = selectedStrategy.type === 'YCUSDC'
-        ? 6
-        : (borrowAsset === 'USDC.e' ? 6 : 18);
-
+  
+      const decimals = selectedStrategy.type === 'CRV_USD'
+        ? 18 // Assuming crvUSD has 18 decimals
+        : (strategyType === 'deposit' && needsUSDCSwap
+          ? 6
+          : (borrowAsset === 'USDC.e' ? 6 : 18));
+  
       const depositAmount = decimals === 18
         ? parseEther(borrowAmount)
         : parseUnits(borrowAmount, decimals);
-
+  
       console.log("Deposit params:", {
         vault: selectedStrategy.vault,
         amount: depositAmount.toString(),
         decimals,
         recipient: address
       });
-
+  
       const hash = await writeContract(config, {
         address: selectedStrategy.vault as `0x${string}`,
         abi: ABIS.VAULT,
@@ -567,7 +590,7 @@ export function EnhancedTransactionFlow({
         ],
         chain: arbitrum,
       });
-
+  
       if (hash) {
         console.log("Deposit tx hash:", hash);
         updateStepState(stepId, 'pending');
@@ -585,73 +608,116 @@ export function EnhancedTransactionFlow({
       setError('Failed to deposit in vault. Please try again.');
     }
   };
+  
 
+const getApprovalTitle = () => {
+  if (strategyType === 'deposit' && needsUSDCSwap) {
+    return selectedStrategy?.type === 'CRV_USD' 
+      ? 'Approve crvUSD for Goat.fi' 
+      : 'Approve USDC for Goat.fi';
+  }
+  return `Approve ${
+    needsUSDCSwap 
+      ? (selectedStrategy?.type === 'CRV_USD' ? 'crvUSD' : 'USDC') 
+      : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)
+  } for Goat.fi`;
+};
 
-  const steps = [
+const getApprovalDescription = () => {
+  if (strategyType === 'deposit' && needsUSDCSwap) {
+    return selectedStrategy?.type === 'CRV_USD'
+      ? 'Approve Goat.fi vault to use your crvUSD'
+      : 'Approve Goat.fi vault to use your USDC';
+  }
+  return `Approve Goat.fi vault to use your ${
+    needsUSDCSwap 
+      ? (selectedStrategy?.type === 'CRV_USD' ? 'crvUSD' : 'USDC') 
+      : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)
+  }`;
+};
+
+const getDepositDescription = () => {
+  if (strategyType === 'deposit' && needsUSDCSwap) {
+    return selectedStrategy?.type === 'CRV_USD'
+      ? 'Deposit crvUSD in Goat.fi vault'
+      : 'Deposit USDC in Goat.fi vault';
+  }
+  return `Deposit ${
+    needsUSDCSwap 
+      ? (selectedStrategy?.type === 'CRV_USD' ? 'crvUSD' : 'USDC') 
+      : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)
+  } in Goat.fi vault`;
+};
+
+const steps = [
+  {
+    id: 1,
+    title: strategyType === 'deposit'
+      ? `Approve ${depositAsset} Deposit`
+      : `Approve ${selectedAsset?.symbol || ''} Deposit`,
+    description: strategyType === 'deposit'
+      ? `Approve Silo market to use your ${depositAsset}`
+      : `Approve Silo market to use your ${selectedAsset?.symbol || ''}`,
+    action: handleSiloApproval,
+    isEnabled: !!selectedAsset && !!depositAmount && hasDepositBalance(depositAmount)
+  },
+  {
+    id: 2,
+    title: `Deposit & Borrow`,
+    description: strategyType === 'deposit'
+      ? `Deposit ${depositAsset} and borrow USDC.e`
+      : `Deposit ${selectedAsset?.symbol || ''} and borrow ${borrowAsset}`,
+    action: handleSiloDepositAndBorrow,
+    isEnabled: !!selectedAsset && (selectedAsset.symbol === 'ETH' || hasSiloApproval(depositAmount))
+  },
+  ...(needsWethWrap ? [{
+    id: 3,
+    title: 'Wrap ETH to WETH',
+    description: 'Wrap your borrowed ETH to WETH for Goat.fi',
+    action: handleWethWrap,
+    isEnabled: currentStep === 3
+  }] : []),
+  ...(needsUSDCSwap ? [
     {
-      id: 1,
-      title: strategyType === 'deposit'
-        ? `Approve ${depositAsset} Deposit`
-        : `Approve ${selectedAsset?.symbol || ''} Deposit`,
-      description: strategyType === 'deposit'
-        ? `Approve Silo market to use your ${depositAsset}`
-        : `Approve Silo market to use your ${selectedAsset?.symbol || ''}`,
-      action: handleSiloApproval,
-      isEnabled: !!selectedAsset && !!depositAmount && hasDepositBalance(depositAmount)
+      id: needsWethWrap ? 4 : 3,
+      title: 'Approve USDC.e for Odos',
+      description: 'Approve Odos router to use your USDC.e',
+      action: handleOdosApproval,
+      isEnabled: currentStep === (needsWethWrap ? 4 : 3)
     },
     {
-      id: 2,
-      title: `Deposit & Borrow`,
-      description: strategyType === 'deposit'
-        ? `Deposit ${depositAsset} and borrow USDC.e`
-        : `Deposit ${selectedAsset?.symbol || ''} and borrow ${borrowAsset}`,
-      action: handleSiloDepositAndBorrow,
-      isEnabled: !!selectedAsset && (selectedAsset.symbol === 'ETH' || hasSiloApproval(depositAmount))
-    },
-    ...(needsWethWrap ? [{
-      id: 3,
-      title: 'Wrap ETH to WETH',
-      description: 'Wrap your borrowed ETH to WETH for Goat.fi',
-      action: handleWethWrap,
-      isEnabled: currentStep === 3
-    }] : []),
-    ...(needsUSDCSwap ? [
-      {
-        id: needsWethWrap ? 4 : 3,
-        title: 'Approve USDC.e for Odos',
-        description: 'Approve Odos router to use your USDC.e',
-        action: handleOdosApproval,
-        isEnabled: currentStep === (needsWethWrap ? 4 : 3)
-      },
-      {
-        id: needsWethWrap ? 5 : 4,
-        title: 'Swap USDC.e to USDC',
-        description: 'Swap your USDC.e to USDC using Odos',
-        action: handleOdosSwap,
-        isEnabled: currentStep === (needsWethWrap ? 5 : 4)
-      }
-    ] : []),
-      {
-        id: (needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0),
-        title: strategyType === 'deposit' && needsUSDCSwap
-          ? 'Approve USDC for Goat.fi'
-          : `Approve ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)} for Goat.fi`,
-        description: strategyType === 'deposit' && needsUSDCSwap
-          ? 'Approve Goat.fi vault to use your USDC'
-          : `Approve Goat.fi vault to use your ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)}`,
-        action: handleVaultApproval,
-        isEnabled: currentStep === ((needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0))
-      },
-      {
-        id: (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0),
-        title: `Deposit in Vault`,
-        description: strategyType === 'deposit' && needsUSDCSwap
-          ? 'Deposit USDC in Goat.fi vault'
-          : `Deposit ${needsUSDCSwap ? 'USDC' : (borrowAsset === 'ETH' ? 'WETH' : borrowAsset)} in Goat.fi vault`,
-        action: handleVaultDeposit,
-        isEnabled: currentStep === ((needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0))
-      }
-  ];
+      id: needsWethWrap ? 5 : 4,
+      title: selectedStrategy?.type === 'CRV_USD' ? 'Swap USDC.e to crvUSD' : 'Swap USDC.e to USDC',
+      description: selectedStrategy?.type === 'CRV_USD' ? 'Swap your USDC.e to crvUSD using Odos' : 'Swap your USDC.e to USDC using Odos',
+      action: handleOdosSwap,
+      isEnabled: currentStep === (needsWethWrap ? 5 : 4)
+    }
+  ] : []),
+  {
+    id: (needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0),
+    title: getApprovalTitle(),
+    description: getApprovalDescription(),
+    action: handleVaultApproval,
+    isEnabled: currentStep === ((needsWethWrap ? 4 : 3) + (needsUSDCSwap ? 2 : 0))
+  },
+  {
+    id: (needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0),
+    title: `Deposit in Vault`,
+    description: getDepositDescription(),
+    action: handleVaultDeposit,
+    isEnabled: currentStep === ((needsWethWrap ? 5 : 4) + (needsUSDCSwap ? 2 : 0))
+  }
+];
+
+console.log('Step Debug:', {
+  needsUSDCSwap,
+  selectedStrategyType: selectedStrategy?.type,
+  borrowAsset,
+  totalSteps: steps.length,
+  currentStep,
+  hasSwapSteps: steps.some(s => s.title.includes('Swap'))
+});
+  
   
 
   const currentStepObj = steps.find(step => step.id === currentStep);

@@ -61,7 +61,7 @@ const TARGET_VAULTS = {
   },
   CRV_USD: {
     address: '0xA7781F1D982Eb9000BC1733E29Ff5ba2824cDBE5',
-    symbol: 'USDC.e'
+    symbol: 'crvUSD'
   },
   YCSETH: {
     address: '0x878b7897C60fA51c2A7bfBdd4E3cB5708D9eEE43',
@@ -117,7 +117,7 @@ const formatTokenAddress = (chain: string, address: string) => {
   return address;  
 };
 
-const TOKENS = {
+export const TOKENS = {
   // Base tokens
   ETH: formatTokenAddress('arbitrum', '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'),
   'USDC.e': formatTokenAddress('arbitrum', '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8'),
@@ -544,14 +544,14 @@ const executeTransaction = async () => {
             // When in borrow mode, show vaults for the borrowed asset
             // If borrowing USDC.e, show both USDC.e and USDC vaults
             if (borrowAsset === 'USDC.e') {
-              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC';
+              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC' || vault.symbol === 'crvUSD';
             }
             return vault.symbol === borrowAsset;
           } else if (strategyType === 'deposit') {
             // When in deposit mode, show vaults for what we'll borrow
             if (depositAsset === 'ETH') {
               // If depositing ETH, show both USDC.e and USDC vaults
-              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC';
+              return vault.symbol === 'USDC.e' || vault.symbol === 'USDC' || vault.symbol === 'crvUSD';
             } else {
               // If depositing USDC.e, show ETH vaults
               return vault.symbol === 'ETH';
@@ -563,7 +563,7 @@ const executeTransaction = async () => {
             address: vault.address,
             name: `${key.replace('_', '.')} Vault Strategy`,
             apy: (goatData[vault.address]?.vaultApy || 0) * 100,
-            type: key.replace('_', '.'),
+            type: key,
             vault: vault.address
           }))
           .filter(strategy => strategy.apy > 0);
@@ -669,17 +669,22 @@ const executeTransaction = async () => {
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {strategyType === 'deposit' ? 'Deposit' : 'Collateral'} Amount
+                  {strategyType === 'deposit' 
+                    ? `Deposit Amount (${depositAsset})` 
+                    : `Collateral Amount (${selectedAsset?.symbol})`}
                 </label>
                 <Input
                   type="number"
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
                   className="w-full"
+                  placeholder={`Enter ${strategyType === 'deposit' ? depositAsset : selectedAsset?.symbol} amount`}
                 />
-                {selectedAsset && prices[TOKENS[selectedAsset.symbol as keyof typeof TOKENS]] && (
+                {depositAmount && (
                   <div className="text-sm text-gray-500 mt-1">
-                    ≈ ${getUSDValue(depositAmount, selectedAsset.symbol)} USD
+                    ≈ ${strategyType === 'deposit'
+                      ? getUSDValue(depositAmount, depositAsset)
+                      : getUSDValue(depositAmount, selectedAsset?.symbol || '')} USD
                     {priceLoading && <span className="ml-2 text-blue-500">Updating price...</span>}
                   </div>
                 )}
